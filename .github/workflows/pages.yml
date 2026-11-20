@@ -5,17 +5,15 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: read
     steps:
       - uses: actions/checkout@v6
       - name: Check JavaScript and snapshot integrity
@@ -30,6 +28,30 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Wait for uploaded Pages artifact to appear in the API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if [ "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq 'any(.artifacts[]; .name == "github-pages")')" = true ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Uploaded Pages artifact did not become visible within 30 seconds.' >&2
+          exit 1
       - name: Deploy public website
         id: deployment
         uses: actions/deploy-pages@v4
