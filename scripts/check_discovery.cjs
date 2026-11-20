@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const {availabilityFor,inspectLink}=require('../dist/availability.js');
+const {availabilityFor,inspectLink,matchesSignal}=require('../dist/availability.js');
 const base={url:'https://devpost.com/software/example',links:[],trailer:false,trial:null};
 assert.equal(availabilityFor(base).state,'unknown');
 assert.equal(availabilityFor({...base,trailer:true}).state,'video');
@@ -16,6 +16,11 @@ assert.equal(inspectLink({url:'https://www.meta.com/en-gb/experiences/example/12
 assert.equal(inspectLink({url:'https://www.meta.com/experiences/release-channels/123/'}),'access');
 assert.equal(inspectLink({url:'https://www.meta.com/experiences/sample-app/123/'}),'store');
 assert.equal(inspectLink({url:'https://developers.meta.com/documentation/'}),'reference');
+const overlapping={...base,trial:'Mentioned',links:[{url:'https://www.meta.com/experiences/app/123/'},{url:'https://person.github.io/app/'}]};
+assert.equal(availabilityFor(overlapping).state,'store');
+assert.equal(matchesSignal(overlapping,'web'),true);
+assert.equal(matchesSignal(overlapping,'demo'),true);
+assert.equal(matchesSignal(overlapping,'download'),false);
 const data=JSON.parse(fs.readFileSync(path.join(__dirname,'../dist/data.json'),'utf8'));
 for(const project of data.projects){
   const a=availabilityFor(project);
