@@ -29,17 +29,37 @@
     if(['store','web','download','access','share','website'].includes(signal))return access[signal].length>0;
     return access.state===signal;
   }
+  // Editorial placement is separate from the captured facts and category estimates.
+  const featuredProjects=[
+    {id:'1545743',name:'FingerSling',collection:'play',category:'Gaming'},
+    {id:'1545716',name:'ClayBox Touch',collection:'create',category:'Productivity'}
+  ];
+  function featuredFor(project){return featuredProjects.find(feature=>feature.id===project.id)||null;}
+  function isFeaturedMatch(project,collection='all'){const feature=featuredFor(project);return Boolean(feature&&(!['play','create','unwind'].includes(collection)||feature.collection===collection));}
+  function surpriseProject(projects,random,collection='all'){
+    if(!projects.length)return null;
+    const featured=projects.filter(project=>isFeaturedMatch(project,collection));
+    const pool=featured.length&&random()<0.2?featured:projects;
+    return pool[Math.floor(random()*pool.length)];
+  }
+  function hash(value){let n=2166136261;for(const c of value)n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0;}
+  function discoveryOrder(a,b,order,seed,{featuredFirst=true,collection='all'}={}){
+    if(order==='name')return a.name.localeCompare(b.name);
+    if(order==='likes')return b.likes-a.likes||a.name.localeCompare(b.name);
+    const rank=project=>Number(isFeaturedMatch(project,collection));
+    return (featuredFirst?rank(b)-rank(a):0)||hash(seed+a.id)-hash(seed+b.id)||a.id.localeCompare(b.id);
+  }
   const collections=[
-    {id:'all',name:'All projects',description:'An evenly shuffled view of the complete snapshot.',confidence:'Observed',matches:()=>true},
-    {id:'play',name:'Play & puzzle',description:'Titles and taglines with a leading Gaming keyword estimate.',confidence:'Estimated',matches:p=>p.estimatedCategory==='Gaming'},
-    {id:'create',name:'Create & design',description:'Public titles and taglines mentioning sculpting, modeling, painting, creative tools, architecture, or design.',confidence:'Estimated',matches:p=>/\b(sculpt\w*|model[li]ng|paint\w*|creative tools?|creators?|architecture|design\w*|atelier|3d print\w*|sewing|garment)\b/i.test(p.name+' '+p.tagline)},
+    {id:'all',name:'All projects',description:'Featured projects followed by a stable shuffle of the remaining snapshot.',confidence:'Observed',matches:()=>true},
+    {id:'play',name:'Play & puzzle',description:'Gaming keyword matches plus the editorially featured FingerSling project. This is a discovery collection, not an official submission track.',confidence:'Estimated',matches:p=>p.estimatedCategory==='Gaming'||featuredFor(p)?.collection==='play'},
+    {id:'create',name:'Create & design',description:'Creative-tool keyword matches plus the editorially featured ClayBox Touch project. This is a discovery collection, not an official submission track.',confidence:'Estimated',matches:p=>featuredFor(p)?.collection==='create'||/\b(sculpt\w*|model[li]ng|paint\w*|creative tools?|creators?|architecture|design\w*|atelier|3d print\w*|sewing|garment)\b/i.test(p.name+' '+p.tagline)},
     {id:'unwind',name:'Unwind & explore',description:'Public titles and taglines mentioning calm, travel, cinema, nature, music, or relaxation.',confidence:'Estimated',matches:p=>/\b(relax\w*|calm\w*|travel|cinema|nature|meditat\w*|music|ocean|museum|campfire|aquarium|destinations?)\b/i.test(p.name+' '+p.tagline)},
     {id:'access',name:'Find access links',description:'Projects with a listed store, web, download, access-request, or Meta share URL. Destinations are untested.',confidence:'Observed',matches:p=>{const a=availabilityFor(p);return ['store','web','download','access','share'].some(k=>a[k].length);}},
     {id:'solo',name:'Solo creators',description:'Exactly one collaborator is listed publicly on Devpost.',confidence:'Observed',matches:p=>p.teamSize===1},
     {id:'hands',name:'Hand tracking mentions',description:'A hand-tracking keyword was found in the project story. Features are not verified.',confidence:'Estimated',matches:p=>p.themes?.includes('Hand tracking')},
     {id:'less-seen',name:'One like or fewer',description:'Projects with zero or one public likes at capture. This is an exposure filter, not an assessment of quality.',confidence:'Observed',matches:p=>p.likes<=1}
   ];
-  const api={availabilityFor,inspectLink,matchesSignal,collections,names};
+  const api={availabilityFor,inspectLink,matchesSignal,collections,names,featuredFor,isFeaturedMatch,discoveryOrder,surpriseProject};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   else root.GalleryAvailability=api;
 })(globalThis);

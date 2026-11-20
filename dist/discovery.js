@@ -5,7 +5,6 @@ const query=new URLSearchParams(location.search);
 const state={data:null,projects:[],filtered:[],limit:12,view:query.get('view')==='saved'?'saved':'browse',shared:null,compare:new Set()};
 const listParam=query.get('list');
 if(listParam)state.shared=[...new Set(listParam.split(',').filter(id=>/^\d+$/.test(id)))].slice(0,100);
-function hash(value){let n=2166136261;for(const c of value)n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0;}
 function saveQuery(){
   const params=new URLSearchParams();if(state.view==='saved')params.set('view','saved');
   if(state.shared)params.set('list',state.shared.join(','));
@@ -25,14 +24,15 @@ function filter(){
   const q=el('discover-search').value.trim().toLocaleLowerCase(),c=collection(),access=el('availability').value;
   state.filtered=activeBase().filter(p=>c.matches(p)&&A.matchesSignal(p,access,p.access)&&(!q||[p.name,p.tagline,...(p.tags||[]),...(p.team||[]).map(m=>m.name)].join(' ').toLocaleLowerCase().includes(q)));
   const order=el('discover-sort').value,seed=state.data.snapshotCompletedAt.slice(0,10);
-  state.filtered.sort((a,b)=>order==='name'?a.name.localeCompare(b.name):order==='likes'?b.likes-a.likes||a.name.localeCompare(b.name):hash(seed+a.id)-hash(seed+b.id));
+  state.filtered.sort((a,b)=>A.discoveryOrder(a,b,order,seed,{featuredFirst:state.view==='browse'&&state.shared===null,collection:c.id}));
 }
 function render(){
   if(!state.data)return;
   filter();const savedView=state.view==='saved'||state.shared!==null,c=collection();
+  el('discover-sort').querySelector('[value="mix"]').textContent=savedView?'Explore a mix':'Featured first';
   el('view-eyebrow').textContent=state.shared?'A SHARED SELECTION':savedView?'YOUR SHORTLIST':'MAKE A DISCOVERY';
   el('view-title').textContent=state.shared?'Someone saved you a few ideas.':savedView?'Your “come back to this” list.':c.id==='all'?'A few good places to start.':c.name;
-  el('view-description').innerHTML=state.shared?'This selection contains only public project IDs. Save individual projects to keep them on this device.':savedView?'Saved on this device. Select two or three projects to compare.':c.id==='all'?'Explore a shuffled mix. Save anything that catches your eye.':`${G.confidence(c.confidence)} ${html(c.description)}`;
+  el('view-description').innerHTML=state.shared?'This selection contains only public project IDs. Save individual projects to keep them on this device.':savedView?'Saved on this device. Select two or three projects to compare.':c.id==='all'?(el('discover-sort').value==='mix'?'Featured picks first, followed by a shuffled mix. Save anything that catches your eye.':'Explore matching projects in your chosen order. Save anything that catches your eye.'):`${G.confidence(c.confidence)} ${html(c.description)}`;
   document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(savedView?'saved':'browse')));
   el('results-count').textContent=`${state.filtered.length.toLocaleString('en-GB')} ${state.filtered.length===1?'project':'projects'}${savedView?' in this selection':' in this view'}`;
   el('share-list').hidden=!savedView;el('share-list').disabled=activeBase().length===0;
@@ -47,13 +47,18 @@ function render(){
 }
 function card(p,savedView){
   const a=p.access;
-  return `<article class="discovery-card"><button class="project-cover-button" data-open="${html(p.id)}" aria-label="View ${html(p.name)}">${p.heroImage?`<img src="${href(p.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:`<span class="cover-fallback" aria-hidden="true">${html(p.name.slice(0,1))}</span>`}</button><div class="card-content"><div class="card-access ${a.state==='unknown'?'unknown-access':''}" title="${html(a.reason)}">${html(a.label)}</div><button class="card-name" data-open="${html(p.id)}">${html(p.name)}</button><p class="card-description">${html(p.tagline||'Open the public project page to explore this idea.')}</p><div class="card-signals">${G.confidence(a.confidence)}${el('availability').value!=='all'&&el('availability').value!==a.state?`<span>Also: ${html(A.names[el('availability').value])}</span>`:''}<span>${p.teamSize?(p.teamSize===1?'Solo creator':p.teamSize+' listed members'):'Team unknown'}</span></div>${savedView?`<label class="compare-toggle"><input type="checkbox" data-compare="${html(p.id)}" ${state.compare.has(p.id)?'checked':''}> Compare this project</label>`:''}<div class="card-actions"><button class="project-open" data-open="${html(p.id)}">Details & access</button><button class="button save-button" data-save="${html(p.id)}">Save</button></div></div></article>`;
+  return `<article class="discovery-card">${A.featuredFor(p)?'<span class="featured-label">Featured</span>':''}<button class="project-cover-button" data-open="${html(p.id)}" aria-label="View ${html(p.name)}">${p.heroImage?`<img src="${href(p.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:`<span class="cover-fallback" aria-hidden="true">${html(p.name.slice(0,1))}</span>`}</button><div class="card-content"><div class="card-access ${a.state==='unknown'?'unknown-access':''}" title="${html(a.reason)}">${html(a.label)}</div><button class="card-name" data-open="${html(p.id)}">${html(p.name)}</button><p class="card-description">${html(p.tagline||'Open the public project page to explore this idea.')}</p><div class="card-signals">${G.confidence(a.confidence)}${el('availability').value!=='all'&&el('availability').value!==a.state?`<span>Also: ${html(A.names[el('availability').value])}</span>`:''}<span>${p.teamSize?(p.teamSize===1?'Solo creator':p.teamSize+' listed members'):'Team unknown'}</span></div>${savedView?`<label class="compare-toggle"><input type="checkbox" data-compare="${html(p.id)}" ${state.compare.has(p.id)?'checked':''}> Compare this project</label>`:''}<div class="card-actions"><button class="project-open" data-open="${html(p.id)}">Details & access</button><button class="button save-button" data-save="${html(p.id)}">Save</button></div></div></article>`;
 }
 function renderGuides(){
   const guides=[['play','Play & puzzle','Find a new challenge, a tabletop world, or a little friendly competition.','▧'],['create','Create & design','Shape an idea, make something, or discover a different kind of creative tool.','◈'],['unwind','Unwind & explore','Follow a story, find a calmer moment, or see somewhere new.','✳']];
-  el('guide-cards').innerHTML=guides.map(([id,title,copy,symbol])=>{const c=A.collections.find(x=>x.id===id);return `<button class="guide-card" data-collection="${id}"><span class="guide-symbol" aria-hidden="true">${symbol}</span><h3>${title}</h3><p>${copy}</p><small>${state.projects.filter(c.matches).length.toLocaleString('en-GB')} matching projects · keyword-guided</small></button>`;}).join('');
+  el('guide-cards').innerHTML=guides.map(([id,title,copy,symbol])=>{const c=A.collections.find(x=>x.id===id);return `<button class="guide-card" data-collection="${id}"><span class="guide-symbol" aria-hidden="true">${symbol}</span><h3>${title}</h3><p>${copy}</p><small>${state.projects.filter(c.matches).length.toLocaleString('en-GB')} matching projects · guided collection</small></button>`;}).join('');
 }
-function randomProject(){if(!state.filtered.length)return;const n=new Uint32Array(1);crypto.getRandomValues(n);G.openProject(state.filtered[n[0]%state.filtered.length].id);}
+function randomProject(){
+  const random=()=>{const n=new Uint32Array(1);crypto.getRandomValues(n);return n[0]/4294967296;};
+  const project=A.surpriseProject(state.filtered,random,collection().id);
+  if(project)G.openProject(project.id);
+}
+
 function openCompare(){
   const picks=state.projects.filter(p=>state.compare.has(p.id)).slice(0,3);if(picks.length<2)return;
   el('comparison').style.gridTemplateColumns=`repeat(${picks.length},minmax(0,1fr))`;

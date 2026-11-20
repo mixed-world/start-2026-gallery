@@ -45,8 +45,15 @@ exposed by the public sources inspected. Category estimates and guided
 collections use transparent keyword rules. Missing evidence remains unknown.
 First public project activity is not a submission timestamp.
 
-The default discovery order is a stable hash-based shuffle seeded by snapshot
-date. It is not a popularity ranking or a personalized recommendation.
+The default discovery order places matching **Featured** projects first, then
+uses a stable hash-based shuffle seeded by snapshot date. FingerSling and
+ClayBox Touch are editorial picks for Play & puzzle and Create & design,
+respectively. Existing search and access filters still apply. Explicit
+alphabetical and public-like sorts, saved/shared shortlist ordering, measured
+analytics, and captured category estimates are preserved. Featured placement
+is not a judging result or a personalized recommendation. “Surprise me” uses
+a matching Featured pool for one in five draws when available, and the full
+matching set for the other draws. All filtered projects remain eligible.
 The initial snapshot captured 2,103 unique project IDs from 88 gallery pages,
 against a displayed total of 2,105. All captured detail pages loaded. Dated
 Devpost winner badges establish platform prize history, which can include
