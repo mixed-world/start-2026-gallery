@@ -1,0 +1,10 @@
+.venv/
+.cache/
+__pycache__/
+*.tar.gz
+.DS_Store
+.openai/
+.sites-runtime/
+.sites/
+.env
+.env.*
